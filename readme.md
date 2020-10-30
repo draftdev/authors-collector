@@ -1,4 +1,4 @@
-# Draft.dev Author Database
+# Draft.dev Author Collector
 
 This project contains the Draft.dev Author Database collection code that is run on n8n.io
 
