@@ -1,0 +1,171 @@
+{
+  "name": "Collect Posts",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=update sources\nset last_checked_at = now()\nwhere id = '{{$json[\"id\"]}}'"
+      },
+      "name": "Update Last Checked Date",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        620,
+        450
+      ],
+      "credentials": {
+        "postgres": "DO Database"
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select * from sources\norder by last_checked_at asc\nFETCH FIRST ROW ONLY;"
+      },
+      "name": "Get Next Source",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        440,
+        300
+      ],
+      "credentials": {
+        "postgres": "DO Database"
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{$json[\"rss_url\"]}}"
+      },
+      "name": "Get Latest Posts",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        620,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const source = $node[\"Get Next Source\"].json;\nconst lastChecked = source['last_checked_at'] ? (new Date(source['last_checked_at'])).toISOString() : null;\n\nreturn items\n  .filter(item => item.json.isoDate > lastChecked) // Make sure it's new\n  .map(item => ({json: {    // Transform each item\n    title: item.json.title,\n    url: item.json.link,\n    description: item.json.contentSnippet,\n    source_id: item.json.source_id = source['id'],\n    original_author: item.json.creator,\n    original_topics: JSON.stringify(item.json.categories),\n    published_at: new Date(item.json.isoDate),\n    source_last_checked: lastChecked,\n  }}));"
+      },
+      "name": "Filter and transform",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        800,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "table": "posts",
+        "columns": "title,url,description,source_id,original_author,original_topics,published_at"
+      },
+      "name": "Save Posts",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        970,
+        300
+      ],
+      "credentials": {
+        "postgres": "DO Database"
+      }
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyHour",
+              "minute": 5
+            }
+          ]
+        }
+      },
+      "name": "Cron",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        250,
+        460
+      ]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Get Next Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Next Source": {
+      "main": [
+        [
+          {
+            "node": "Get Latest Posts",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update Last Checked Date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Latest Posts": {
+      "main": [
+        [
+          {
+            "node": "Filter and transform",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter and transform": {
+      "main": [
+        [
+          {
+            "node": "Save Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron": {
+      "main": [
+        [
+          {
+            "node": "Get Next Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {},
+  "id": "1"
+}
