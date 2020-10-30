@@ -1,0 +1,15 @@
+{
+  "name": "authors-collector",
+  "version": "0.1.0",
+  "description": "",
+  "dependencies": {
+    "n8n": "^0.90.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "start": "n8n"
+  },
+  "author": "Karl Hughes <karl@draft.dev>",
+  "license": "Apache-2.0"
+}
+
