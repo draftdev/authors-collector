@@ -1,0 +1,152 @@
+{
+  "name": "Extract Topics",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [
+        250,
+        270
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Get posts joined to topics\nselect t_posts.id as post_id,\n       topics.id as topic_id,\n       topics.name as topic_name\nfrom (\n         select id,\n                -- Standardizes text formatting\n                translate(lower(\n                                                  posts.title || ' ' || posts.description || ' ' ||\n                                      -- Converts topic array to string\n                                                  array_to_string(array_agg(topics), ' ')\n                              ), '-,.,\\,,!,:', ' , , , , ') as topic_text\n         from posts\n                  left join lateral json_array_elements_text(posts.original_topics) topics on true\n         where topics_extracted_at is null\n         group by id\n         order by created_at desc\n         limit 10\n     ) t_posts\n         left join topics on t_posts.topic_text like '%' || topics.name || '%' AND LENGTH(topics.name) > 2\norder by post_id asc;\n"
+      },
+      "name": "Get Post Topics",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        470,
+        200
+      ],
+      "credentials": {
+        "postgres": "DO Database"
+      }
+    },
+    {
+      "parameters": {
+        "table": "post_topics",
+        "columns": "post_id,topic_id"
+      },
+      "name": "Save Post Topics",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        870,
+        100
+      ],
+      "credentials": {
+        "postgres": "DO Database"
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=update posts\nset topics_extracted_at=now()\nwhere id='{{$json[\"post_id\"]}}'"
+      },
+      "name": "Save Topic Extraction Date",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        650,
+        280
+      ],
+      "credentials": {
+        "postgres": "DO Database"
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.filter(item => item.json.topic_id);"
+      },
+      "name": "Filter items without topics",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        660,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyHour",
+              "minute": 10
+            },
+            {
+              "mode": "everyHour",
+              "minute": 40
+            }
+          ]
+        }
+      },
+      "name": "Cron",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        250,
+        110
+      ]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Get Post Topics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Post Topics": {
+      "main": [
+        [
+          {
+            "node": "Save Topic Extraction Date",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Filter items without topics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter items without topics": {
+      "main": [
+        [
+          {
+            "node": "Save Post Topics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron": {
+      "main": [
+        [
+          {
+            "node": "Get Post Topics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {},
+  "id": "2"
+}
