@@ -1,6 +1,6 @@
 # Draft.dev Author Collector
 
-This project contains the Draft.dev Author Database collection code that is run on n8n.io
+This project contains the Draft.dev Author Database collection code that is run on n8n.io.
 
 ## Deploying to Production
 - Set up a new DO droplet with Node 12+ installed
@@ -72,7 +72,9 @@ create table posts
     original_author varchar(256),
     original_topics json,
     created_at timestamp default now() not null,
-    published_at timestamp
+    published_at timestamp,
+    topics_extracted_at timestamp,
+    author_extracted_at timestamp
 );
 
 create unique index posts_url_uindex
